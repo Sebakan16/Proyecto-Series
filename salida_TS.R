@@ -1,6 +1,6 @@
 salida_TS = function(Y, fit, fixed){
 print(summary(fit))
-print(summary_arima(fit, fixed = fixed))
+print(summary.arima(fit, fixed = fixed))
 
 M = cbind(ks.test(scale(fit$res), "pnorm")$p.value,
 lmtest::bptest(fit$res ~ time(fit$res))$p.value)
