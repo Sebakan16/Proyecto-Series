@@ -30,10 +30,12 @@ ndiffs(ts(X, frequency = 12)) # Se diferencia con 1
 nsdiffs(ts(X, frequency = 12)) # 0
 
 # Se trabaja con la serie diferenciada
-X_dif <- diff(log(X), lag = ndiffs(ts(X, frequency = 12)))
+X_dif <- diff((X), lag = ndiffs(ts(X, frequency = 12)))
 
-acf(X_dif)
-pacf(X_dif)
+plot(X_dif, type = "l")
+
+acf(X)
+pacf(X)
 
 ndiffs(ts(X_dif, frequency = 12))
 nsdiffs(ts(X_dif, frequency = 12))
@@ -50,14 +52,17 @@ salida_TS(X_dif, fit1, fixed = c(NA, NA, NA))
 TS.diag(fit1$res)
 
 #         AR       1   2  3  4  5  6  7  8  9  10 11 12 13 14 15 16 17 18
-fixed <- c(NA, NA)
+fixed <- c(0, 
+           NA, NA, 0, 0, rep(0, 6), NA, rep(0, 7), NA, 
+           NA, NA, NA)
 
-fit2 <- forecast::Arima(X_dif, 
-                        order = c(1, 0, 1),
-                        fixed = fixed, include.mean = FALSE)
-salida_TS(X_dif, fit2, fixed = fixed)
-TS.diag(fit2$res)
+fit2 <- forecast::Arima(X, 
+                        order = c(1, 1, 19), seasonal = list(order = c(3, 1, 0), period = 12),
+                        fixed = fixed)
+salida_TS(X, fit2, fixed = fixed)
+ TS.diag(fit2$res)
 
+LSTS::Box.Ljung.Test(fit2$res, lag = 30)
 
 # No pescar ---------------------------------------------------------------
 
@@ -66,7 +71,7 @@ TS.diag(fit2$res)
 par(mfrow = c(2,3))
 plot(X)
 plot(diff(X))
-plot(X_dif)
+plot(X_dif, type = "l")
 acf(X, ylim = c(-1,+1), lag.max = 36)
 acf(diff(X), ylim = c(-1,+1), lag.max = 36)
 acf(X_dif, ylim = c(-1,+1), lag.max = 36)
@@ -77,17 +82,17 @@ pacf(c(X_dif), ylim = c(-1,+1), lag.max = 11, xlim = c(0,11))
 acf(c(X_dif), ylim = c(-1,+1), lag.max = 60)
 pacf(c(X_dif), ylim = c(-1,+1), lag.max = 60, xlim = c(0,60))
 
-fit <- forecast::auto.arima(X_dif, d = 1, D = 1)
+fit <- forecast::auto.arima(X_dif_n, d = 1, D = 12)
 source("summary.arima.R")
 summary(fit)
 summary_arima(fit, fixed = c(NA,NA,NA,NA,NA))
 
-fit01 <- forecast::Arima(X_dif, order = c(0,1,1), seasonal = c(1,1,2))
-fit02 <- forecast::Arima(X_dif, order = c(0,1,1), seasonal = c(1,1,1))
-fit03 <- forecast::Arima(X_dif, order = c(0,1,1), seasonal = c(1,1,0))
-fit04 <- forecast::Arima(X_dif, order = c(0,1,1), seasonal = c(0,1,2))
-fit05 <- forecast::Arima(X_dif, order = c(0,1,1), seasonal = c(0,1,1))
-fit06 <- forecast::Arima(X_dif, order = c(0,1,1), seasonal = c(0,1,0))
+fit01 <- forecast::Arima(X_dif_n, order = c(0,1,1), seasonal = c(1,1,2))
+fit02 <- forecast::Arima(X_dif_n, order = c(0,1,1), seasonal = c(1,1,1))
+fit03 <- forecast::Arima(X_dif_n, order = c(0,1,1), seasonal = c(1,1,0))
+fit04 <- forecast::Arima(X_dif_n, order = c(0,1,1), seasonal = c(0,1,2))
+fit05 <- forecast::Arima(X_dif_n, order = c(0,1,1), seasonal = c(0,1,1))
+fit06 <- forecast::Arima(X_dif_n, order = c(0,1,1), seasonal = c(0,1,0))
 
 summary(fit01)
 summary(fit02)
@@ -121,3 +126,19 @@ fit05.3 <- forecast::Arima(co2, order = c(1,1,9), seasonal = c(0,1,1), fixed = c
 summary_arima(fit05.3, fixed = c(NA,0,NA,NA,0,0,0,0,0,NA,NA))
 
 tsdiag(fit05.3, 24)
+
+q1 <- quantile(X_dif, 0.25)
+q3 <- quantile(X_dif, 0.75)
+
+iqr <- q3 - q1
+
+lower_bound <- q1 - 1.5 * iqr
+upper_bound <- q3 + 1.5 * iqr
+
+X_dif_n <- X_dif[X_dif >= lower_bound & X_dif <= upper_bound]
+plot(X_dif_n, type = "l")
+
+boxplot(X_dif_n)
+
+acf(X_dif_n, lag = 60)
+pacf(X_dif_n, lag = 60)
