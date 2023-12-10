@@ -19,8 +19,9 @@ colnames(datos) <- sub(".*?, ", "", colnames(datos))
 datos <- na.omit(datos)
 
 X <- datos$`Banco Santander-Chile`[-c(136:148)]
-Xt <- ts(X, frequency = 12)
+Xt <- ts(X, frequency = 12,start = c(2011,1))
 
+plot(Xt)
 datos1 <- cbind(X, "imacec" = df[-c(136:154),2])
 
 # Calcular el numero de diferenciaciones
@@ -37,7 +38,7 @@ pacf(X_dif)
 ndiffs(ts(X_dif, frequency = 12))
 nsdiffs(ts(X_dif, frequency = 12))
 
-lambda <- forecast::BoxCox.lambda(X_, method = "guerrero")
+lambda <- forecast::BoxCox.lambda(X_dif, method = "guerrero")
 plot(forecast::BoxCox(Xt, lambda = lambda), col = "steelblue")
 
 LSTS::periodogram(X_dif)
