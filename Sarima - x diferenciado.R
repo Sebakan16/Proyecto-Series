@@ -11,9 +11,19 @@ source("salida_TS.R")
 
 
 # Carga de datos ----
+
+##es un excel solo con los datos que nos importan del santander para hacer la leida de datos mas sencilla
+data = rio::import("santander.xlsx", skip = 2)
+
+#se crea la serie dejando fuera lo que hay que predecir
+X1 <- data$`Stock de cartera consumo en incumplimiento por institución, Banco Santander-Chile`[-c(136:148)]
+Xt <- ts(X1, frequency = 12,start = c(2011,1))
+
+
+
+
 ### Stock total de cartera consumo.
-datos <- rio::import("CMF_CONT_BANC_STO_CCS_INCUMP_AGIFI_MM$_MONT_V_old.xlsx",
-                     skip = 3)
+datos <- rio::import("CMF_CONT_BANC_STO_CCS_INCUMP_AGIFI_MM$_MONT_V_old.xlsx", skip = 2)
 df <- rio::import("rial_imacec.xlsx", skip = 2)
 colnames(datos) <- sub(".*?, ", "", colnames(datos))
 datos <- na.omit(datos)
@@ -63,6 +73,53 @@ salida_TS(X, fit2, fixed = fixed)
  TS.diag(fit2$res)
 
 LSTS::Box.Ljung.Test(fit2$res, lag = 30)
+
+
+# Prediccion --------------------------------------------------------------
+#se leen los datos a predecir
+datos_pred = datos$`Banco Santander-Chile`[-c(1:136)]
+
+val = ts(datos_pred, start = c(2022, 9), end = c(2023, 8),frequency = 12)
+
+# aplicar las mismas transformaciones y diferenciacion que a los datos de entrenamiento
+val = diff(val,differences = 1)
+
+#se crea la prediccion, donde fit1 corresponde al modelo arma, sarima, sarimax, cambiar segun corresponda
+algo = forecast(fit1, h = 12) 
+# ,xreg = blabla, si se agregan variables exogenas al modelo, etc
+
+
+par(mfrow = c(1,1), bty = "n", las = 1, font.main = 1)
+# grafica las predicciones
+plot(algo) 
+
+#grafica el valor real de los datos
+lines(val, col = "orange", lwd = 2)  
+
+# grafica los datos estimados por el modelo
+lines(fit1$fitted,col ="red") 
+
+
+
+### como ejemplo con un sarima copiando metodo de la clase 26
+
+y2 =  diff(Xt, differences = 1)
+s <- frequency(y2)
+s # implica que tenemos un sarima (q,0,p)(Q,0,P)[12]
+Z <- diff(y2, lag = s)
+ 
+Z1 = auto.arima(Z)
+
+algo = forecast(Z1, h = 12)
+
+par(mfrow = c(1,1), bty = "n", las = 1, font.main = 1)
+plot(algo) #predic
+lines(val, col = "orange", lwd = 2) #real 
+lines(Z1$fitted,col ="red") #estimacion modelo 
+
+#predice mal debido a que no podemos diferenciar la series con "s"
+# pork nos quedamos sin datos al ser s=12 :c
+
 
 # No pescar ---------------------------------------------------------------
 
