@@ -80,6 +80,12 @@ model2 <- lm(BS ~ .,
 
 summary(model2)
 
+matriz_correlacion2 <- cor(santander %>%
+                            select(-c(fecha, mes, ano, tipo,
+                                      UF, consumo, UTM)))
+
+corrplot(matriz_correlacion2, method = "color")
+
 # Análisis residual
 qqnorm(model2$residuals)
 qqline(model2$residuals, col = "red")
@@ -88,6 +94,25 @@ shapiro.test(model2$residuals) # NO rechazamos la normalidad de los residuos
 # como p-value > 0.05
 
 # Modelando un SARIMAX ----
-auto.arima(model2$residuals)
+fit_auto <- auto.arima(model2$residuals)
 
-plot(1:136, model2$residuals, type = "l")
+source("TS.diag.R")
+source("summary.arima.R")
+source("salida_TS.R")
+
+salida_TS(model2$residuals, fit_auto, fixed = c(NA, NA))
+TS.diag(fit_auto$residuals)
+
+# Jugando con el modelo
+fixed <- c(NA, NA, # AR 
+           NA # MA
+)
+
+fit1 <- forecast::Arima(model2$residuals,
+                        order = c(2, 0, 1),
+                        seasonal = c(0, 0, 0),
+                        fixed = fixed,
+                        include.mean = FALSE)
+
+salida_TS(model2$residuals, fit1, fixed = fixed)
+TS.diag(fit1$residuals)
