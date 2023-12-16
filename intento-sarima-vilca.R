@@ -9,7 +9,7 @@ library(lubridate)
 
 # Paso 1: Transformaciones----
 
-lambda <- forecast::BoxCox.lambda(Y, method = "guerrero")
+lambda <- forecast::BoxCox.lambda(log(Y), method = "guerrero")
 
 # argumentar q usar el log pq lo dice Boxcox y por la plata
 
@@ -40,12 +40,12 @@ TS.diag(model_diff$residuals)
 
 fixed <- c(NA, NA, # AR
            rep(0, 28), NA,  # MA
-           rep(NA, 10) # SMA
+           NA,rep(0, 4),NA # SMA
 )
 
 fit_diff <- forecast::Arima(log(Y),
                             order = c(2, 1, 29),
-                            seasonal = c(0, 0, 10),
+                            seasonal = c(0, 0, 5),
                             fixed = fixed,
                             include.mean = FALSE,
                             include.drift = F)
