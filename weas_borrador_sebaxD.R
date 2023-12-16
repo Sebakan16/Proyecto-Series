@@ -114,65 +114,17 @@ ggsave("grafico_boxplot.png",
 
 # Correlaciones ----
 matriz_correlacion <- cor(santander %>%
-                            select(-c(fecha, mes, ano, tipo)))
+                            select(-c(fecha, mes, ano, tipo)) %>%
+                            mutate(BS = log(BS),
+                                   UTM = log(UTM),
+                                   UF = log(UF),
+                                   IVP = log(IVP)))
+matriz_correlacion[, 1]
 
 corrplot(matriz_correlacion, method = "color")
 
 pairs(santander %>%
         select(-c(fecha, mes, ano, tipo)))
-
-# Modelamiento
-
-model <- lm(BS ~ .,
-            data = santander %>%
-              filter(tipo == "entrenamiento") %>%
-              select(-c(fecha, mes, ano, tipo)))
-
-summary(model)
-
-# Modelo significativo
-model2 <- lm(BS ~ .,
-             data = santander %>%
-               filter(tipo == "entrenamiento") %>%
-               select(-c(fecha, mes, ano, tipo, UF, consumo, UTM)))
-
-summary(model2)
-
-# Análisis residual
-qqnorm(model2$residuals)
-qqline(model2$residuals, col = "red")
-
-shapiro.test(model2$residuals) # NO rechazamos la normalidad de los residuos
-# como p-value > 0.05
-
-# Modelando un SARIMAX ----
-fit_auto <- auto.arima(model2$residuals)
-
-source("TS.diag.R")
-source("summary.arima.R")
-source("salida_TS.R")
-
-salida_TS(model2$residuals, fit_auto, fixed = c(NA, NA))
-TS.diag(fit_auto$residuals)
-
-# Jugando con el modelo
-fixed <- c(NA, NA, # AR 
-           NA # MA
-)
-
-fit1 <- forecast::Arima(model2$residuals,
-                        order = c(2, 0, 1),
-                        seasonal = c(0, 0, 0),
-                        fixed = fixed,
-                        include.mean = FALSE)
-
-salida_TS(model2$residuals, fit1, fixed = fixed)
-TS.diag(fit1$residuals)
-
-
-
-# SARIMA by Seba:    -------
-# Intento SARIMA
 
 Y <- santander %>%
   filter(tipo == "entrenamiento") %>% 
@@ -182,52 +134,116 @@ Y <- santander %>%
 
 Y <- ts(Y$BS, frequency = 12)
 
-# Paso de diferenciación
+# Modelando un SARIMA ----
 
-# Y <- diff(Y, lag = ndiffs(Y))
+lambda <- forecast::BoxCox.lambda(log(Y), method = "guerrero")
+f.Y <- forecast::BoxCox(log(Y), lambda = lambda)
+plot(f.Y, lwd = 3, col = "gray", ylab = "", main = "Transformación Box-Cox Imacec No Minero")
 
-acf(diff(Y), lag.max = 19)
-pacf(diff(Y))
+## Diferenciamos?
 
-# ?forecast::Arima
+d <- forecast::ndiffs(f.Y)
+plot(diff(f.Y, differences = d), main = expression((1-B)*f(Y[t])), ylab = "")
+acf(diff(f.Y, differences = d), lag.max = 120)
+## Diferenciamos Estacionalmente?
+s <- frequency(f.Y)
+s
+D <- forecast::nsdiffs(diff(f.Y, differences = d))
+## Z[t] = (1-B)(1-B^s) f(Y[t]), s = 12.
+Z <- diff(diff(f.Y, differences = d, lag = 1), lag = s) # differences = D = 0
+plot(Z, main = expression((1-B)*(1-B^s)*f(Y[t])), ylab = "")
 
-lambda <- forecast::BoxCox.lambda(Y, method = "guerrero")
-plot(forecast::BoxCox(Y, lambda = lambda), col = "steelblue")
-LSTS::periodogram(Y)
+## ACF parte regular
+par(mfrow = c(1,2))
+acf(c(Z), lag.max = 11, ylim = c(-0.2,+1), main = "")
+pacf(c(Z), lag.max = 11, ylim = c(-0.2,+1), xlim = c(0,11), main = "")
+## p = 2, q = 2 o 5
 
-# Modelo auto SARIMA ----
+## ACF parte estacional
+par(mfrow = c(1,2))
+acf(c(Z), lag.max = 48, ylim = c(-1,+1), main = "")
+pacf(c(Z), lag.max = 60, ylim = c(-1,+1), xlim = c(0,60), main = "")
+## p = 1, q = 1 o 4
 
-model_diff <- auto.arima(Y)
+#   autoarima
+fit <- forecast::auto.arima(log(Y), d = d, D = D,
+                            max.p = 2, max.q = 5,
+                            max.P = 1, max.Q = 4)
+fit
+plot(fit)
+salida_TS(log(Y), fit, fixed = c(NA,NA,NA))
+TS.diag(fit$residuals)
+Box.Ljung.Test(fit$residuals, lag = 40)
 
-salida_TS(Y, model_diff, fixed = c(NA, NA))
-TS.diag(model_diff$residuals)
-
-# Jugando con el SARIMA ----
-
-# Wea que salió bonita
-# fit_diff <- forecast::Arima(Y, 
-#                             order = c(2, 1, 29),
-#                             seasonal = c(0, 0, 5),
-#                             fixed = fixed,
-#                             include.mean = FALSE,
-#                             include.drift = T)
-
-
-fixed <- c(0, NA, # AR
-           NA, rep(0, 18), rep(0, 9), NA,  # MA
-           0, 0, 0, 0, NA # SMA
+# jugando
+fixed = c(0, NA, # AR
+          NA, NA, 0, NA, # MA
+          0, 0, 0, 0, NA # SMA
 )
 
-fit_diff <- forecast::Arima(Y, 
-                            order = c(2, 1, 29),
-                            seasonal = c(0, 0, 5),
-                            fixed = fixed,   # Si no corres esto se muere el pc
-                            include.mean = FALSE,
-                            include.drift = T)
+fit2 <- forecast::Arima(log(Y),
+                        order = c(2, 1, 4),
+                        seasonal = c(0, 0, 5),
+                        include.mean = FALSE,
+                        fixed = fixed)
+# fit2
+plot(fit2, lwd = 0.1)
+salida_TS(log(Y), fit2, fixed = fixed)
+TS.diag(fit2$residuals)
+Box.Ljung.Test(fit2$residuals, lag = 50)
 
-salida_TS(Y, fit_diff, fixed = fixed)
+pred_profe <- forecast::forecast(fit2, h = 12)
+plot(pred_profe)
 
-Box.Ljung.Test(fit_diff$residuals, lag = 40)
-abline(v = 30)
-plot(forecast::forecast(fit_diff, h = 12))
+
+# SARIMAX ----
+
+exog_var <- santander %>%
+  filter(tipo == "entrenamiento") %>%
+  select(IVP) %>%
+  mutate(IVP = log(IVP))
+exog_var <- as.matrix(exog_var)
+
+fixed <- c(0, NA, # AR
+           0, 0, 0, 0, # MA  1, 2, 4 NA
+           0, 0, 0, 0, NA, # SMA
+           rep(NA, ncol(exog_var))
+)
+
+fite <- forecast::Arima(log(Y),
+                        order = c(2, 1, 4),
+                        seasonal = c(0, 0, 5),
+                        fixed = fixed,
+                        xreg = exog_var)
+salida_TS(log(Y), fite, fixed = fixed)
+TS.diag(fite$residuals)
+
+pre <- forecast::forecast(fite, h = 12, xreg = log(new_exog[, 1]))
+plot(pre)
+
+
+
+# para ver
+fixed <- c(0, NA, # AR
+           NA, NA, 0, NA, # MA  1, 2, 4 NA
+           0, 0, 0, 0, NA, # SMA
+           rep(NA, ncol(exog_var))
+)
+
+fitexd <- forecast::Arima(log(Y),
+                          order = c(2, 1, 4),
+                          seasonal = c(0, 0, 5),
+                          fixed = fixed,
+                          xreg = exog_var)
+plot(fitexd)
+salida_TS(log(Y), fitexd, fixed = fixed)
+TS.diag(fitexd$residuals)
+
+pre <- forecast::forecast(fitexd, h = 12, xreg = log(new_exog[, 1]))
+plot(pre)
+
+# SARIMA by Seba:    -------
+# Intento SARIMA
+
+
 
