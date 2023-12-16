@@ -18,7 +18,7 @@ data = rio::import("santander.xlsx", skip = 2)
 #se crea la serie dejando fuera lo que hay que predecir
 X1 <- data$`Stock de cartera consumo en incumplimiento por institución, Banco Santander-Chile`[-c(136:148)]
 Xt <- ts(X1, frequency = 12,start = c(2011,1))
-
+auto.arima(X1)
 
 
 
@@ -41,7 +41,7 @@ nsdiffs(ts(X, frequency = 12)) # 0
 
 # Se trabaja con la serie diferenciada
 X_dif <- diff((X), lag = ndiffs(ts(X, frequency = 12)))
-
+auto.arima(X_dif)
 plot(X_dif, type = "l")
 
 acf(X)
