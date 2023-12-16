@@ -77,27 +77,25 @@ abline(v=seq(12, 136, by = 12), lty = 2, col = "gray")
 
 fixed <- c(NA, NA, # AR
            0, 0, 0, 0, NA,  # MA
-           NA#,
-           #0#,  # SMA
+           0, # SAR
+           0, 0, NA, 0  # SMA
 )
 
 fit_diff <- forecast::Arima(log(Y), 
                             order = c(2, d, 5),
-                            seasonal = c(1, 0, 0),
+                            seasonal = c(1, 0, 4),
                             #lambda = lambda,
                             fixed = fixed,
                             include.mean = FALSE,
                             include.drift = FALSE
 )
 
-
-
 salida_TS(log(Y), fit_diff, fixed = fixed)
 
-Box.Ljung.Test(fit_diff$residuals, lag = 135)
+Box.Ljung.Test(fit_diff$residuals, lag = 50)
 plot(forecast::forecast(fit_diff, h = 12))
 TS.diag(fit_diff$residuals)
-
+plot(fit_diff)
 
 
 
@@ -209,6 +207,30 @@ Box.Ljung.Test(fit_diffx2$residuals, lag = 50)
 plot(forecast::forecast(fit_diffx2, h = 12, xreg = santander$dolar[137:148]))
 TS.diag(fit_diffx2$residuals)
 plot(fit_diffx2)
+
+# Peso gringo 2.0
+fixedx2.0 <- c(NA, NA, # AR
+              0, 0, 0, 0, 0,  # MA
+              0, # SAR
+              NA, 0, 0, 0,  # SMA
+              NA)
+
+
+fit_diffx2.0 <- forecast::Arima(log(Y), 
+                              order = c(2, 1, 5),
+                              seasonal = c(1, 0, 4),
+                              fixed = fixedx2.0,
+                              xreg = santander$dolar[1:136],
+                              include.mean = TRUE,
+                              include.drift = FALSE
+)
+
+salida_TS(log(Y), fit_diffx2.0, fixed = fixedx2.0)
+
+Box.Ljung.Test(fit_diffx2.0$residuals, lag = 50)
+plot(forecast::forecast(fit_diffx2.0, h = 12, xreg = santander$dolar[137:148]))
+TS.diag(fit_diffx2.0$residuals)
+plot(fit_diffx2.0)
 
 # Cobre
 
