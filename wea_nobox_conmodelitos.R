@@ -15,8 +15,6 @@ source("salida_TS.R")
 santander <- rio::import("santander.xlsx", skip = 2)
 colnames(santander) <- c("fecha", "BS")
 santander$fecha <- as.Date(santander$fecha)
-santander$ano <- year(santander$fecha)
-santander$mes <- year(santander$fecha)
 
 santander$tipo <- c(rep("entrenamiento", 148-12),
                     rep("validacion",12))
@@ -38,33 +36,33 @@ lambda <- forecast::BoxCox.lambda(log(Y), method = "guerrero")
 lambda2 <- forecast::BoxCox.lambda(log(Y), method = "loglik")
 f.Y <- forecast::BoxCox(log(Y), lambda = lambda)
 
-MASS::boxcox(lm(log(Y) ~ 1))
+MASS::boxcox(lm((Y) ~ 1))
 
 # Diferenciaciones --------------------------------------------------------
 
-forecast::ndiffs(log(Y), test = "adf")
-forecast::ndiffs(log(Y), test = "pp")
-forecast::ndiffs(log(Y), test = "kpss")
+forecast::ndiffs((Y), test = "adf")
+forecast::ndiffs((Y), test = "pp")
+forecast::ndiffs((Y), test = "kpss")
 
 d <- forecast::ndiffs(log(Y))
 
-plot(diff(log(Y), differences = d), main = expression((1-B)*f(Y[t])), ylab = "")
-acf(diff(log(Y), differences = d), lag.max = 136)
-pacf(diff(log(Y), differences = d), lag.max = 136)
+plot(diff((Y), differences = d), main = expression((1-B)*f(Y[t])), ylab = "")
+acf(diff((Y), differences = d), lag.max = 136)
+pacf(diff((Y), differences = d), lag.max = 136)
 
 ## Diferenciamos Estacionalmente?
 s <- frequency(log(Y))
 
-forecast::nsdiffs(diff(log(Y), differences = d), test = "seas")
-forecast::nsdiffs(diff(log(Y), differences = d), test = "ocsb")
-forecast::nsdiffs(diff(log(Y), differences = d), test = "hegy")
-forecast::nsdiffs(diff(log(Y), differences = d), test = "ch")
+forecast::nsdiffs(diff((Y), differences = d), test = "seas")
+forecast::nsdiffs(diff((Y), differences = d), test = "ocsb")
+forecast::nsdiffs(diff((Y), differences = d), test = "hegy")
+forecast::nsdiffs(diff((Y), differences = d), test = "ch")
 
-D <- forecast::nsdiffs(diff(log(Y), differences = d), test = "hegy")
+D <- forecast::nsdiffs(diff(log(Y), differences = d))
 # Este es cero, no necesitamos añadirlo al modelo
 
 ## Z[t] = (1-B)(1-B^s) f(Y[t]), s = 12.
-Z <- diff(diff(log(Y), differences = d, lag = 1), lag = s, differences = D)
+Z <- diff((Y), differences = d)
 plot(Z, main = expression((1-B)*(1-B^s)*f(Y[t])), ylab = "")
 
 ## ACF parte regular
@@ -81,23 +79,8 @@ pacf(c(Z), lag.max = 136, ylim = c(-1,+1), xlim = c(0,136), main = "")
 abline(v=seq(12, 136, by = 12), lty = 2, col = "gray")
 # P = 1, Q = 1
 
-# Modelo auto SARIMA ----
 
-model_diff <- auto.arima(Y)
-
-salida_TS(Y, model_diff, fixed = c(NA, NA))
-TS.diag(model_diff$residuals)
-
-# Jugando con el SARIMA ----
-
-# Wea que salió bonita
-# fit_diff <- forecast::Arima(Y, 
-#                             order = c(2, 1, 29),
-#                             seasonal = c(0, 0, 5),
-#                             fixed = fixed,
-#                             include.mean = FALSE,
-#                             include.drift = T)
-
+# Sarima ------------------------------------------------------------------
 
 
 fixed <- c(NA, NA, # AR
@@ -149,3 +132,66 @@ plot(forecast::forecast(fit_diff2, h = 12))
 TS.diag(fit_diff2$residuals)
 
 # PROBAR A LOS DOS CTM CON VARIABLES EXÓGENAS, en volá así los weones mejoran
+
+
+# Sarimax -----------------------------------------------------------------
+
+desempleo <- rio::import("Indicador.xls", skip = 2)
+
+desempleo$Mes <- as.Date(desempleo$Mes)
+
+tasa <- desempleo %>% 
+  filter(Mes >= as.Date("2011-01-01") & Mes <= as.Date("2023-08-01")) %>% 
+  filter(!Mes %in% c(as.Date("2013-07-01"), as.Date("2015-11-01"),
+                     as.Date("2015-12-01"), as.Date("2016-10-01")))
+
+santander %>% 
+  filter(fecha >= as.Date("2015-01-01") & fecha <= as.Date("2016-12-01")) 
+# Falta noviembre y diciembre de 2015
+# Falta julio del 2013
+# Falta octubre del 2016
+
+santander$desempleo <- tasa$Valor
+
+fixedx <- c(NA, NA, # AR
+           0, 0, 0, 0, NA,  # MA
+           NA, # SAR
+           #0#,  # SMA
+           NA
+)
+
+fit_diffx <- forecast::Arima((Y), 
+                            order = c(2, 1, 5),
+                            seasonal = c(1, 0, 0),
+                            fixed = fixedx,
+                            xreg = santander$desempleo[1:136],
+                            include.mean = FALSE,
+                            include.drift = FALSE
+)
+
+salida_TS((Y), fit_diffx, fixed = fixedx)
+
+Box.Ljung.Test(fit_diffx$residuals, lag = 135)
+plot(forecast::forecast(fit_diffx, h = 12, xreg = santander$desempleo[137:148]))
+TS.diag(fit_diffx$residuals)
+
+fixedx2 <- c(NA, NA, # AR
+            0, 0, 0, 0, NA,  # MA
+            #0, # SAR
+            NA,  # SMA
+            NA)
+
+fit_diffx2 <- forecast::Arima((Y), 
+                             order = c(2, d, 5),
+                             seasonal = c(0, 0, 1),
+                             #lambda = lambda,
+                             fixed = fixedx2,
+                             include.mean = FALSE,
+                             include.drift = TRUE
+)
+
+salida_TS((Y), fit_diffx2, fixed = fixedx2)
+
+Box.Ljung.Test(fit_diff2$residuals, lag = 135)
+plot(forecast::forecast(fit_diff2, h = 12))
+TS.diag(fit_diff2$residuals)
