@@ -4,6 +4,10 @@ library(dplyr)
 library(corrplot)
 library(forecast)
 
+# 30 julio 2020 primero retiro
+# 10 diciembre 2020
+# 28 abril 2021
+
 # Datos TS ----
 santander <- rio::import("santander.xlsx", skip = 2)
 colnames(santander) <- c("fecha", "BS")
@@ -54,6 +58,60 @@ santander <- santander %>%
   left_join(aux,
             by = "fecha")
 
+# Gráfico TS ----
+
+# 30 julio 2020 primero retiro
+# 10 diciembre 2020
+# 28 abril 2021
+
+grafo_TS <- santander %>%
+  ggplot(aes(y = BS, x = fecha)) +
+  geom_line(color = "#FF1A15", lwd = 1.5) +
+  scale_x_date(date_breaks = "2 years",
+               date_labels = "%Y",
+               guide = guide_axis(angle = 45)) +
+  geom_line(data = santander %>%
+              filter((fecha > as.Date("2020-07-30") &
+                        fecha < as.Date("2022-04-28"))),
+            aes(y = BS, x = fecha),
+            color = "#3A5FCD", lwd = 1.5) +
+  geom_line(data = santander %>%
+              filter((tipo == "validacion")),
+            aes(y = BS, x = fecha),
+            color = "green4", lwd = 1.5) +
+  scale_y_continuous(labels = scales::comma_format()) +
+  # theme_linedraw() +
+  theme_light() +
+  theme(axis.title.y = element_blank(),
+        axis.title.x = element_blank(),
+        axis.text.y = element_text(size = 15),
+        axis.text.x = element_text(size = 15))
+
+
+
+ggsave("grafico_transparente.png",
+       plot = grafo_TS,
+       bg = "transparent",
+       height = 7, width = 7)
+
+# Boxplot serie ----
+
+BP <- santander %>%
+  ggplot(aes(x = BS)) +
+  geom_boxplot(fill = "#FF1A15", varwidth = 0.5, lwd = 0.5) +
+  ylim(c(-0.75, 0.75)) +
+  theme_light() +
+  scale_x_continuous(labels = scales::comma_format()) +
+  theme(axis.title.y = element_blank(),
+        axis.title.x = element_blank(),
+        axis.text.y = element_blank(),
+        axis.text.x = element_text(size = 15))
+
+ggsave("grafico_boxplot.png",
+       plot = BP,
+       bg = "transparent",
+       height = 7, width = 7)
+
 # Correlaciones ----
 matriz_correlacion <- cor(santander %>%
                             select(-c(fecha, mes, ano, tipo)))
@@ -79,12 +137,6 @@ model2 <- lm(BS ~ .,
                select(-c(fecha, mes, ano, tipo, UF, consumo, UTM)))
 
 summary(model2)
-
-matriz_correlacion2 <- cor(santander %>%
-                            select(-c(fecha, mes, ano, tipo,
-                                      UF, consumo, UTM)))
-
-corrplot(matriz_correlacion2, method = "color")
 
 # Análisis residual
 qqnorm(model2$residuals)
@@ -116,3 +168,66 @@ fit1 <- forecast::Arima(model2$residuals,
 
 salida_TS(model2$residuals, fit1, fixed = fixed)
 TS.diag(fit1$residuals)
+
+
+
+# SARIMA by Seba:    -------
+# Intento SARIMA
+
+Y <- santander %>%
+  filter(tipo == "entrenamiento") %>% 
+  # filter((fecha < as.Date("2020-07-30") |
+  #           fecha > as.Date("2022-04-28"))) %>%
+  select(BS)
+
+Y <- ts(Y$BS, frequency = 12)
+
+# Paso de diferenciación
+
+# Y <- diff(Y, lag = ndiffs(Y))
+
+acf(diff(Y), lag.max = 19)
+pacf(diff(Y))
+
+# ?forecast::Arima
+
+lambda <- forecast::BoxCox.lambda(Y, method = "guerrero")
+plot(forecast::BoxCox(Y, lambda = lambda), col = "steelblue")
+LSTS::periodogram(Y)
+
+# Modelo auto SARIMA ----
+
+model_diff <- auto.arima(Y)
+
+salida_TS(Y, model_diff, fixed = c(NA, NA))
+TS.diag(model_diff$residuals)
+
+# Jugando con el SARIMA ----
+
+# Wea que salió bonita
+# fit_diff <- forecast::Arima(Y, 
+#                             order = c(2, 1, 29),
+#                             seasonal = c(0, 0, 5),
+#                             fixed = fixed,
+#                             include.mean = FALSE,
+#                             include.drift = T)
+
+
+fixed <- c(0, NA, # AR
+           NA, rep(0, 18), rep(0, 9), NA,  # MA
+           0, 0, 0, 0, NA # SMA
+)
+
+fit_diff <- forecast::Arima(Y, 
+                            order = c(2, 1, 29),
+                            seasonal = c(0, 0, 5),
+                            fixed = fixed,   # Si no corres esto se muere el pc
+                            include.mean = FALSE,
+                            include.drift = T)
+
+salida_TS(Y, fit_diff, fixed = fixed)
+
+Box.Ljung.Test(fit_diff$residuals, lag = 40)
+abline(v = 30)
+plot(forecast::forecast(fit_diff, h = 12))
+
