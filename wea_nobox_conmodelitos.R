@@ -30,39 +30,31 @@ Y <- ts(Y$BS, frequency = 12)
 
 plot(log(santander$BS), type = "l")
 
-# Transformación ----------------------------------------------------------
-
-lambda <- forecast::BoxCox.lambda(log(Y), method = "guerrero")
-lambda2 <- forecast::BoxCox.lambda(log(Y), method = "loglik")
-f.Y <- forecast::BoxCox(log(Y), lambda = lambda)
-
-MASS::boxcox(lm((Y) ~ 1))
-
 # Diferenciaciones --------------------------------------------------------
 
-forecast::ndiffs((Y), test = "adf")
-forecast::ndiffs((Y), test = "pp")
-forecast::ndiffs((Y), test = "kpss")
+forecast::ndiffs(log(Y), test = "adf")
+forecast::ndiffs(log(Y), test = "pp")
+forecast::ndiffs(log(Y), test = "kpss")
 
 d <- forecast::ndiffs(log(Y))
 
-plot(diff((Y), differences = d), main = expression((1-B)*f(Y[t])), ylab = "")
-acf(diff((Y), differences = d), lag.max = 136)
-pacf(diff((Y), differences = d), lag.max = 136)
+plot(diff(log(Y), differences = d), main = expression((1-B)*f(Y[t])), ylab = "")
+acf(diff(log(Y), differences = d), lag.max = 10)
+pacf(diff(log(Y), differences = d), lag.max = 136)
 
 ## Diferenciamos Estacionalmente?
 s <- frequency(log(Y))
 
-forecast::nsdiffs(diff((Y), differences = d), test = "seas")
-forecast::nsdiffs(diff((Y), differences = d), test = "ocsb")
-forecast::nsdiffs(diff((Y), differences = d), test = "hegy")
-forecast::nsdiffs(diff((Y), differences = d), test = "ch")
+forecast::nsdiffs(diff(log(Y), differences = d), test = "seas")
+forecast::nsdiffs(diff(log(Y), differences = d), test = "ocsb")
+forecast::nsdiffs(diff(log(Y), differences = d), test = "hegy")
+forecast::nsdiffs(diff(log(Y), differences = d), test = "ch")
 
 D <- forecast::nsdiffs(diff(log(Y), differences = d))
 # Este es cero, no necesitamos añadirlo al modelo
 
 ## Z[t] = (1-B)(1-B^s) f(Y[t]), s = 12.
-Z <- diff((Y), differences = d)
+Z <- diff(log(Y), differences = d)
 plot(Z, main = expression((1-B)*(1-B^s)*f(Y[t])), ylab = "")
 
 ## ACF parte regular
@@ -110,24 +102,23 @@ TS.diag(fit_diff$residuals)
 
 
 
-fixed2 <- c(NA, NA, # AR
-            0, 0, 0, 0, NA,  # MA
-            #0, # SAR
-            NA,  # SMA
-            NA)
+fixed2 <- c(0, NA, # AR
+            NA, NA, 0, NA, 0,  # MA
+            0, # SAR
+            0, 0, 0, 0, NA  # SMA
+)
 
 fit_diff2 <- forecast::Arima(log(Y), 
                              order = c(2, d, 5),
-                             seasonal = c(0, 0, 1),
-                             #lambda = lambda,
+                             seasonal = c(1, 0, 5),
                              fixed = fixed2,
                              include.mean = FALSE,
-                             include.drift = TRUE
+                             include.drift = FALSE
 )
 
 salida_TS(log(Y), fit_diff2, fixed = fixed2)
 
-Box.Ljung.Test(fit_diff2$residuals, lag = 135)
+Box.Ljung.Test(fit_diff2$residuals, lag = 50)
 plot(forecast::forecast(fit_diff2, h = 12))
 TS.diag(fit_diff2$residuals)
 
@@ -153,45 +144,65 @@ santander %>%
 
 santander$desempleo <- tasa$Valor
 
+
+pesogringo <- rio::import("dolar.xlsx", skip = 2)
+
+colnames(pesogringo)[1] <- "fecha"
+santander <- santander %>% # Unir datos
+  left_join(dolar,
+            by = "fecha")
+
+#Desempleo
 fixedx <- c(NA, NA, # AR
-           0, 0, 0, 0, NA,  # MA
+            NA, 0, 0, 0, 0,  # MA
            NA, # SAR
-           #0#,  # SMA
+           0,  # SMA
            NA
 )
 
-fit_diffx <- forecast::Arima((Y), 
+fit_diffx <- forecast::Arima(log(Y), 
                             order = c(2, 1, 5),
-                            seasonal = c(1, 0, 0),
+                            seasonal = c(1, 0, 1),
                             fixed = fixedx,
                             xreg = santander$desempleo[1:136],
                             include.mean = FALSE,
                             include.drift = FALSE
 )
 
-salida_TS((Y), fit_diffx, fixed = fixedx)
+salida_TS(log(Y), fit_diffx, fixed = fixedx)
 
 Box.Ljung.Test(fit_diffx$residuals, lag = 135)
 plot(forecast::forecast(fit_diffx, h = 12, xreg = santander$desempleo[137:148]))
 TS.diag(fit_diffx$residuals)
+plot(fit_diffx)
+
+# fixedx2 <- c(NA, NA, # AR
+#              NA, NA, NA, NA, NA,  # MA
+#             NA, # SAR
+#             NA,  # SMA
+#             NA)
 
 fixedx2 <- c(NA, NA, # AR
-            0, 0, 0, 0, NA,  # MA
-            #0, # SAR
-            NA,  # SMA
-            NA)
+             NA, NA, NA, NA, NA,  # MA
+             NA, # SAR
+             NA, NA, NA, NA, NA,  # SMA
+             NA)
 
-fit_diffx2 <- forecast::Arima((Y), 
-                             order = c(2, d, 5),
-                             seasonal = c(0, 0, 1),
-                             #lambda = lambda,
+
+fit_diffx2 <- forecast::Arima(log(Y), 
+                             order = c(2, 1, 5),
+                             seasonal = c(1, 0, 5),
                              fixed = fixedx2,
+                             xreg = santander$desempleo[1:136],
                              include.mean = FALSE,
-                             include.drift = TRUE
+                             include.drift = FALSE
 )
 
-salida_TS((Y), fit_diffx2, fixed = fixedx2)
+salida_TS(log(Y), fit_diffx2, fixed = fixedx2)
 
-Box.Ljung.Test(fit_diff2$residuals, lag = 135)
+Box.Ljung.Test(fit_diff2$residuals, lag = 50)
 plot(forecast::forecast(fit_diff2, h = 12))
 TS.diag(fit_diff2$residuals)
+plot(fit_diffx2)
+
+
