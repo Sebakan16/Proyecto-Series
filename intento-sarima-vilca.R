@@ -125,3 +125,57 @@ dev.off()
 Box.Ljung.Test(fit_diff$residuals, lag = 135)
 plot(forecast::forecast(fit_diff, h = 12))
 
+
+santander <- rio::import("santander.xlsx", skip = 2)
+colnames(santander) <- c("fecha", "BS")
+santander$fecha <- as.Date(santander$fecha)
+
+santander$tipo <- c(rep("entrenamiento", 148-12),
+                    rep("validacion",12))
+
+Y <- santander %>%
+  filter(tipo == "entrenamiento") %>% 
+  # filter((fecha < as.Date("2020-07-30") |
+  #           fecha > as.Date("2022-04-28"))) %>%
+  select(BS) 
+
+Y <- ts(Y$BS, frequency = 12,start = c(2011, 1))
+
+
+fixed2 <- c(0, NA, # AR
+            NA, NA, 0, NA, 0,  # MA
+            0, # SAR
+            0, 0, 0, 0, NA  # SMA
+)
+
+fit_diff2 <- forecast::Arima(log(Y), 
+                             order = c(2, d, 5),
+                             seasonal = c(1, 0, 5),
+                             fixed = fixed2,
+                             include.mean = FALSE,
+                             include.drift = FALSE
+)
+
+datos_pred <- santander %>% 
+  filter(tipo == "validacion") %>% 
+  select(BS)
+
+val1 = log(ts(datos_pred, frequency = 12,start = c(2022, 8)))
+val = log(datos_pred)
+pred <- forecast(fit_diff2, h = 12)
+
+par(mfrow = c(1,1), bty = "n")
+plot(pred, main = "Predicción SARIMA") 
+lines(val1, col = "orange", lwd = 2)
+points(x = seq(12.25,23.25, by = 1), y = val$BS, col = "orange", lwd = 2, type = "l")
+legend("topright",legend = c("Valor Real"),lty = 1,col = c("orange"))
+
+summary(fit_diff2)
+
+#CON ZOOM
+plot(pred, main = "Predicción SARIMA", xlim = c(11,13.25))
+points(x = c(12.25:23.25), y = val$BS, col = "orange", lwd = 2, type = "l")
+legend("topright",legend = c("Valor Real"),lty = 1,col = c("orange"))
+
+
+
