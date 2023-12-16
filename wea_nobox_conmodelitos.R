@@ -144,12 +144,16 @@ santander %>%
 
 santander$desempleo <- tasa$Valor
 
-
 pesogringo <- rio::import("dolar.xlsx", skip = 2)
-
-colnames(pesogringo)[1] <- "fecha"
+colnames(pesogringo) <- c("fecha", "dolar")
 santander <- santander %>% # Unir datos
-  left_join(dolar,
+  left_join(pesogringo,
+            by = "fecha")
+
+oro <- rio::import("cobre.xlsx", skip = 2)
+colnames(oro) <- c("fecha", "cobre", "petroleo")
+santander <- santander %>% # Unir datos
+  left_join(oro,
             by = "fecha")
 
 #Desempleo
@@ -165,13 +169,13 @@ fit_diffx <- forecast::Arima(log(Y),
                             seasonal = c(1, 0, 1),
                             fixed = fixedx,
                             xreg = santander$desempleo[1:136],
-                            include.mean = FALSE,
+                            include.mean = TRUE,
                             include.drift = FALSE
 )
 
 salida_TS(log(Y), fit_diffx, fixed = fixedx)
 
-Box.Ljung.Test(fit_diffx$residuals, lag = 135)
+Box.Ljung.Test(fit_diffx$residuals, lag = 50)
 plot(forecast::forecast(fit_diffx, h = 12, xreg = santander$desempleo[137:148]))
 TS.diag(fit_diffx$residuals)
 plot(fit_diffx)
@@ -182,10 +186,11 @@ plot(fit_diffx)
 #             NA,  # SMA
 #             NA)
 
+# Peso gringo
 fixedx2 <- c(NA, NA, # AR
-             NA, NA, NA, NA, NA,  # MA
-             NA, # SAR
-             NA, NA, NA, NA, NA,  # SMA
+             0, 0, 0, 0, 0,  # MA
+             0, # SAR
+             0, 0, 0, 0, NA,  # SMA
              NA)
 
 
@@ -193,16 +198,62 @@ fit_diffx2 <- forecast::Arima(log(Y),
                              order = c(2, 1, 5),
                              seasonal = c(1, 0, 5),
                              fixed = fixedx2,
-                             xreg = santander$desempleo[1:136],
-                             include.mean = FALSE,
+                             xreg = santander$dolar[1:136],
+                             include.mean = TRUE,
                              include.drift = FALSE
 )
 
 salida_TS(log(Y), fit_diffx2, fixed = fixedx2)
 
-Box.Ljung.Test(fit_diff2$residuals, lag = 50)
-plot(forecast::forecast(fit_diff2, h = 12))
-TS.diag(fit_diff2$residuals)
+Box.Ljung.Test(fit_diffx2$residuals, lag = 50)
+plot(forecast::forecast(fit_diffx2, h = 12, xreg = santander$dolar[137:148]))
+TS.diag(fit_diffx2$residuals)
 plot(fit_diffx2)
 
+# Cobre
 
+fixedx3 <- c(NA, NA, # AR
+             NA, 0, 0, 0, 0,  # MA
+            0, # SAR
+            0, 0, 0, 0, NA,  # SMA
+            NA)
+
+fit_diffx3 <- forecast::Arima(log(Y), 
+                              order = c(2, 1, 5),
+                              seasonal = c(1, 0, 5),
+                              fixed = fixedx3,
+                              xreg = santander$cobre[1:136],
+                              include.mean = TRUE,
+                              include.drift = FALSE
+)
+
+salida_TS(log(Y), fit_diffx3, fixed = fixedx3)
+
+Box.Ljung.Test(fit_diffx3$residuals, lag = 50)
+plot(forecast::forecast(fit_diffx3, h = 12, xreg = santander$cobre[137:148]))
+TS.diag(fit_diffx3$residuals)
+plot(fit_diffx3)
+
+# Petróleo
+
+fixedx4 <- c(NA, NA, # AR
+             NA, NA, NA, NA, NA,  # MA
+             NA, # SAR
+             NA, NA, NA, NA, NA,  # SMA
+             NA)
+
+fit_diffx4 <- forecast::Arima(log(Y), 
+                              order = c(2, 1, 5),
+                              seasonal = c(1, 0, 5),
+                              fixed = fixedx4,
+                              xreg = santander$petroleo[1:136],
+                              include.mean = TRUE,
+                              include.drift = FALSE
+)
+
+salida_TS(log(Y), fit_diffx4, fixed = fixedx4)
+
+Box.Ljung.Test(fit_diffx4$residuals, lag = 50)
+plot(forecast::forecast(fit_diffx4, h = 12, xreg = santander$petroleo[137:148]))
+TS.diag(fit_diffx4$residuals)
+plot(fit_diffx4)
