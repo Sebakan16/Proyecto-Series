@@ -9,7 +9,7 @@ library(lubridate)
 
 # Paso 1: Transformaciones----
 
-lambda <- forecast::BoxCox.lambda(Y, method = "guerrero")
+lambda <- forecast::BoxCox.lambda(log(Y), method = "guerrero")
 
 # argumentar q usar el log pq lo dice Boxcox y por la plata
 
@@ -22,7 +22,77 @@ ndiffs(Y)
 # Paso 3 Construcción del modelo ------
 
 acf((diff(log(Y))), lag.max = 50) # argumenta pq un MA(29)
-pacf((diff(log(Y))), lag.max = 150) # argumenta pq usar un AR(2)
+pacf((diff(log(Y))), lag.max = 50) # argumenta pq usar un AR(2)
+
+acf <- acf((diff(log(Y))), lag.max = 50, plot = F)
+acf_data <- data.frame(Lag = acf$lag,
+                       ACF = acf$acf)
+
+# PACF base
+pacf <- pacf((diff(log(Y))), lag.max = 50, plot = F)
+pacf_data <- data.frame(Lag = pacf$lag,
+                        PACF = pacf$acf)
+
+n = length(Y)
+
+ggplot(acf_data, aes(x = Lag, y = ACF)) +
+  ylim(c(-0.5,1))+
+  geom_hline(yintercept = 0,
+             linetype = "dashed") + 
+  geom_hline(yintercept = 1.96/sqrt(n),
+             linetype = "dashed",
+             col = "black") + 
+  geom_hline(yintercept = -1.96/sqrt(n),
+             linetype = "dashed",
+             col = "black") + 
+  geom_segment(aes(xend = Lag,
+                   yend = 0),
+               color = "#FF1A15",
+               size = 1) + # Líneas verticales
+  geom_point(size = 2,
+             col = "#FF1A15") + # Puntos de color en el extremo de las líneas
+  labs(x = "Lag",
+       y = "ACF") +
+  theme_bw() +
+  theme(axis.text.y = element_text(size = 15),
+        # axis.ticks.y = element_blank(),
+        axis.title.y = element_text(size = 12),
+        plot.title = element_text(size = 10,
+                                  #face = "bold",
+                                  color = "black",
+                                  hjust = 0.5),
+        axis.title.x = element_text(size = 12),
+        axis.text.x = element_text(size = 15))
+
+pacf_data %>%
+  ggplot(aes(x = Lag, y = PACF)) +
+  ylim(c(-0.3,0.3))+
+  geom_hline(yintercept = 0,
+             linetype = "dashed") + 
+  geom_hline(yintercept = 1.96/sqrt(n),
+             linetype = "dashed",
+             col = "black") + 
+  geom_hline(yintercept = -1.96/sqrt(n),
+             linetype = "dashed",
+             col = "black") + 
+  geom_segment(aes(xend = Lag,
+                   yend = 0),
+               color = "#FF1A15",
+               size = 1) + # Líneas verticales
+  geom_point(size = 2,
+             col = "#FF1A15") + # Puntos de color en el extremo de las líneas
+  labs(x = "Lag",
+       y = "PACF") +
+  theme_bw() +
+  theme(axis.text.y = element_text(size = 15),
+        # axis.ticks.y = element_blank(),
+        axis.title.y = element_text(size = 12),
+        plot.title = element_text(size = 10,
+                                  #face = "bold",
+                                  color = "black",
+                                  hjust = 0.5),
+        axis.title.x = element_text(size = 12),
+        axis.text.x = element_text(size = 15))
 
 # Probando con auto SARIMA ----
 
@@ -40,12 +110,12 @@ TS.diag(model_diff$residuals)
 
 fixed <- c(NA, NA, # AR
            rep(0, 28), NA,  # MA
-           rep(NA, 10) # SMA
+           NA,rep(0, 4),NA # SMA
 )
 
 fit_diff <- forecast::Arima(log(Y),
                             order = c(2, 1, 29),
-                            seasonal = c(0, 0, 10),
+                            seasonal = c(0, 0, 5),
                             fixed = fixed,
                             include.mean = FALSE,
                             include.drift = F)
