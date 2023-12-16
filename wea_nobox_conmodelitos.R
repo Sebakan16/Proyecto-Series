@@ -40,33 +40,31 @@ f.Y <- forecast::BoxCox(log(Y), lambda = lambda)
 
 MASS::boxcox(lm(log(Y) ~ 1))
 
-boxcox(lm(x ~ 1))
-
 # Diferenciaciones --------------------------------------------------------
 
-forecast::ndiffs((f.Y), test = "adf")
-forecast::ndiffs((f.Y), test = "pp")
-forecast::ndiffs((f.Y), test = "kpss")
+forecast::ndiffs(log(Y), test = "adf")
+forecast::ndiffs(log(Y), test = "pp")
+forecast::ndiffs(log(Y), test = "kpss")
 
-d <- forecast::ndiffs((f.Y))
+d <- forecast::ndiffs(log(Y))
 
-plot(diff((f.Y), differences = d), main = expression((1-B)*f(Y[t])), ylab = "")
-acf(diff(f.Y, differences = d), lag.max = 136)
-pacf(diff(f.Y, differences = d), lag.max = 136)
+plot(diff(log(Y), differences = d), main = expression((1-B)*f(Y[t])), ylab = "")
+acf(diff(log(Y), differences = d), lag.max = 136)
+pacf(diff(log(Y), differences = d), lag.max = 136)
 
 ## Diferenciamos Estacionalmente?
-s <- frequency((f.Y))
+s <- frequency(log(Y))
 
-forecast::nsdiffs(diff((f.Y), differences = d), test = "seas")
-forecast::nsdiffs(diff((f.Y), differences = d), test = "ocsb")
-forecast::nsdiffs(diff((f.Y), differences = d), test = "hegy")
-forecast::nsdiffs(diff((f.Y), differences = d), test = "ch")
+forecast::nsdiffs(diff(log(Y), differences = d), test = "seas")
+forecast::nsdiffs(diff(log(Y), differences = d), test = "ocsb")
+forecast::nsdiffs(diff(log(Y), differences = d), test = "hegy")
+forecast::nsdiffs(diff(log(Y), differences = d), test = "ch")
 
-D <- forecast::nsdiffs(diff((f.Y), differences = d), test = "hegy")
+D <- forecast::nsdiffs(diff(log(Y), differences = d), test = "hegy")
 # Este es cero, no necesitamos añadirlo al modelo
 
 ## Z[t] = (1-B)(1-B^s) f(Y[t]), s = 12.
-Z <- diff(diff((f.Y), differences = d, lag = 1), lag = s, differences = D)
+Z <- diff(diff(log(Y), differences = d, lag = 1), lag = s, differences = D)
 plot(Z, main = expression((1-B)*(1-B^s)*f(Y[t])), ylab = "")
 
 ## ACF parte regular
@@ -102,41 +100,52 @@ TS.diag(model_diff$residuals)
 
 
 
-fixed <- c(0, NA, # AR
-           0, NA, 0, NA, NA,  # MA
-           0,
-           NA#,  # SMA
-           )
+fixed <- c(NA, NA, # AR
+           0, 0, 0, 0, NA,  # MA
+           NA#,
+           #0#,  # SMA
+)
 
 fit_diff <- forecast::Arima(log(Y), 
                             order = c(2, d, 5),
-                            seasonal = c(1, 0, 1),
-                            #lambda = lambda,
-                            fixed = fixed,
-                            include.mean = FALSE,
-                            include.drift = FALSE
-                            )
-
-fixed2 <- c(NA, NA, # AR
-            NA, 0, 0, NA, NA,  # MA
-           0,
-           NA#,  # SMA
-)
-
-fit_diff2 <- forecast::Arima(log(Y), 
-                            order = c(2, d, 5),
-                            seasonal = c(1, D, 1),
+                            seasonal = c(1, 0, 0),
                             #lambda = lambda,
                             fixed = fixed,
                             include.mean = FALSE,
                             include.drift = FALSE
 )
+
+
 
 salida_TS(log(Y), fit_diff, fixed = fixed)
-salida_TS(log(Y), fit_diff2, fixed = fixed)
 
 Box.Ljung.Test(fit_diff$residuals, lag = 135)
 plot(forecast::forecast(fit_diff, h = 12))
-plot(forecast::forecast(fit_diff2, h = 12))
-
 TS.diag(fit_diff$residuals)
+
+
+
+
+
+fixed2 <- c(NA, NA, # AR
+            0, 0, 0, 0, NA,  # MA
+            #0, # SAR
+            NA,  # SMA
+            NA)
+
+fit_diff2 <- forecast::Arima(log(Y), 
+                             order = c(2, d, 5),
+                             seasonal = c(0, 0, 1),
+                             #lambda = lambda,
+                             fixed = fixed2,
+                             include.mean = FALSE,
+                             include.drift = TRUE
+)
+
+salida_TS(log(Y), fit_diff2, fixed = fixed2)
+
+Box.Ljung.Test(fit_diff2$residuals, lag = 135)
+plot(forecast::forecast(fit_diff2, h = 12))
+TS.diag(fit_diff2$residuals)
+
+# PROBAR A LOS DOS CTM CON VARIABLES EXÓGENAS, en volá así los weones mejoran
