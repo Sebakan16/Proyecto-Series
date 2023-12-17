@@ -62,3 +62,59 @@ BP <- santander %>%
         axis.text.y = element_blank(),
         axis.text.x = element_text(size = 15))
 BP
+
+
+# SARIMA ------------------------------------------------------------------
+
+fixed2 <- c(0, NA, # AR
+            NA, NA, 0, NA, 0,  # MA
+            0, # SAR
+            0, 0, 0, 0, NA  # SMA
+)
+
+fit_diff2 <- forecast::Arima(log(Y), 
+                             order = c(2, 1, 5),
+                             seasonal = c(1, 0, 5),
+                             fixed = fixed2,
+                             include.mean = FALSE,
+                             include.drift = FALSE
+)
+
+salida_TS(log(Y), fit_diff2, fixed = fixed2)
+coef(fit_diff2)
+
+Box.Ljung.Test(fit_diff2$residuals, lag = 50)
+plot(forecast::forecast(fit_diff2, h = 12))
+TS.diag(fit_diff2$residuals)
+
+
+# SARIMAX -----------------------------------------------------------------
+
+pesogringo <- rio::import("dolar.xlsx", skip = 2)
+colnames(pesogringo) <- c("fecha", "dolar")
+santander <- santander %>% # Unir datos
+  left_join(pesogringo,
+            by = "fecha")
+ 
+fixedx2 <- c(NA, NA, # AR
+             0, 0, 0, 0, 0,  # MA
+             0, # SAR
+             0, 0, 0, 0, NA,  # SMA
+             NA)
+
+
+fit_diffx2 <- forecast::Arima(log(Y), 
+                              order = c(2, 1, 5),
+                              seasonal = c(1, 0, 5),
+                              fixed = fixedx2,
+                              xreg = santander$dolar[1:136],
+                              include.mean = TRUE,
+                              include.drift = FALSE
+)
+
+salida_TS(log(Y), fit_diffx2, fixed = fixedx2)
+
+Box.Ljung.Test(fit_diffx2$residuals, lag = 50)
+plot(forecast::forecast(fit_diffx2, h = 12, xreg = santander$dolar[137:148]))
+TS.diag(fit_diffx2$residuals)
+plot(fit_diffx2)

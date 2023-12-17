@@ -139,8 +139,8 @@ Y <- santander %>%
   #           fecha > as.Date("2022-04-28"))) %>%
   select(BS) 
 
-Y <- ts(Y$BS, frequency = 12,start = c(2011, 1))
-
+Y1 <- ts(Y$BS, frequency = 12,start = c(2011, 1))
+Y <- ts(Y$BS, frequency = 12)
 
 fixed2 <- c(0, NA, # AR
             NA, NA, 0, NA, 0,  # MA
@@ -155,7 +155,13 @@ fit_diff2 <- forecast::Arima(log(Y),
                              include.mean = FALSE,
                              include.drift = FALSE
 )
-
+fit_diff22 <- forecast::Arima(log(Y1), 
+                             order = c(2, d, 5),
+                             seasonal = c(1, 0, 5),
+                             fixed = fixed2,
+                             include.mean = FALSE,
+                             include.drift = FALSE
+)
 datos_pred <- santander %>% 
   filter(tipo == "validacion") %>% 
   select(BS)
@@ -163,12 +169,19 @@ datos_pred <- santander %>%
 val1 = log(ts(datos_pred, frequency = 12,start = c(2022, 8)))
 val = log(datos_pred)
 pred <- forecast(fit_diff2, h = 12)
+pred1 <- forecast(fit_diff22, h = 12)
 
 par(mfrow = c(1,1), bty = "n")
-plot(pred, main = "Predicción SARIMA") 
-lines(val1, col = "orange", lwd = 2)
-points(x = seq(12.25,23.25, by = 1), y = val$BS, col = "orange", lwd = 2, type = "l")
+plot(pred, main = "Predicción SARIMA",xlim=c(1,26)) 
+points(x = seq(12,23, by = 1), y = val$BS, col = "orange", lwd = 2, type = "l")
 legend("topright",legend = c("Valor Real"),lty = 1,col = c("orange"))
+
+
+par(mfrow = c(1,1), bty = "n")
+plot(pred1, main = "Predicción SARIMA") 
+lines(val1, col = "orange", lwd = 2)
+legend("topright",legend = c("Valor Real"),lty = 1,col = c("orange"))
+
 
 summary(fit_diff2)
 
